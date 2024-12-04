@@ -37,17 +37,7 @@ public:
     }
 
     void generateRandomData() {
-        if constexpr (std::is_integral_v<T>) {
-            // For integer types
-            for (uint32_t i = 0; i < size; i++) {
-                h_arr[i] = rand() % 1000;
-            }
-        } else if constexpr (std::is_floating_point_v<T>) {
-            // For floating point types
-            for (uint32_t i = 0; i < size; i++) {
-                h_arr[i] = static_cast<T>(rand()) / RAND_MAX * 1000.0;
-            }
-        }
+        generateRandomDataImpl(std::is_integral<T>());
     }
 
     void sort() {
@@ -101,6 +91,21 @@ private:
     void launchSingleThreadSort() {
         // Launch with 1 thread and 1 block
         singleThreadSortKernel<T><<<1, 1>>>(d_arr, d_temp, size);
+    }
+
+    // Helper functions for different types
+    void generateRandomDataImpl(std::true_type) {
+        // For integer types
+        for (uint32_t i = 0; i < size; i++) {
+            h_arr[i] = rand() % 1000;
+        }
+    }
+
+    void generateRandomDataImpl(std::false_type) {
+        // For floating point types
+        for (uint32_t i = 0; i < size; i++) {
+            h_arr[i] = static_cast<T>(rand()) / RAND_MAX * 1000.0;
+        }
     }
 
 public:
