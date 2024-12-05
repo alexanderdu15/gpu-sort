@@ -5,10 +5,12 @@
 #include <type_traits>
 #include "single_thread_merge.cuh"
 #include "parallel_merge_naive.cuh"
+#include "parallel_merge_shared.cuh"
 
 enum class SortMethod {
     SINGLE_THREAD,
-    PARALLEL_NAIVE
+    PARALLEL_NAIVE,
+    PARALLEL_SHARED
 };
 
 template<typename T>
@@ -51,11 +53,13 @@ public:
         cudaMemcpy(d_arr, h_arr, size * sizeof(T), cudaMemcpyHostToDevice);
 
         cudaEventRecord(kernel_start);
-        if (method == SortMethod::PARALLEL_NAIVE) {
-            launchParallelSortNaive();
-        } else {
+        if (method == SortMethod::SINGLE_THREAD) {
             launchSingleThreadSort();
-        } // TODO: add other methods
+        } else if (method == SortMethod::PARALLEL_NAIVE) {
+            launchParallelSortNaive();
+        } else if (method == SortMethod::PARALLEL_SHARED) {
+            launchParallelSortShared();
+        }
         cudaEventRecord(kernel_stop);
 
         cudaMemcpy(h_arr, d_arr, size * sizeof(T), cudaMemcpyDeviceToHost);
@@ -72,6 +76,11 @@ public:
     }
 
 private:
+    void launchSingleThreadSort() {
+        // Launch with 1 thread and 1 block
+        singleThreadSortKernel<T><<<1, 1>>>(d_arr, d_temp, size);
+    }
+
     void launchParallelSortNaive() {
         int threads_per_block = 256; // TODO: try different block sizes?
         int num_blocks = (size + threads_per_block - 1) / threads_per_block; // round up so all elements are sorted
@@ -88,9 +97,20 @@ private:
         }
     }
 
-    void launchSingleThreadSort() {
-        // Launch with 1 thread and 1 block
-        singleThreadSortKernel<T><<<1, 1>>>(d_arr, d_temp, size);
+    void launchParallelSortShared() {
+        int threads_per_block = 256; // TODO: try different block sizes?
+        int num_blocks = (size + threads_per_block - 1) / threads_per_block; // round up so all elements are sorted
+
+        // Local sort within blocks
+        parallelMergeSortSharedKernel<T><<<num_blocks, threads_per_block>>>(d_arr, d_temp, size);
+
+        // Merge across blocks, need this becuase we can't sync threads across blocks
+        for (uint32_t stride = threads_per_block; stride < size; stride *= 2) {
+            uint32_t merge_blocks = (size + (2 * stride) - 1) / (2 * stride); // number of blocks needed to merge
+            if (merge_blocks > 0) {
+                mergeBlocksSharedKernel<T><<<merge_blocks, threads_per_block>>>(d_arr, d_temp, size, stride);
+            }
+        }
     }
 
     // Helper functions for different types

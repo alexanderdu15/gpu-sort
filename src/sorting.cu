@@ -14,7 +14,14 @@ void runTestForType(const string& type_name, uint32_t* sizes, int RUNS_PER_SIZE,
                    SortMethod* methods, int num_methods, ofstream& outfile) {
     for (int m = 0; m < num_methods; m++) {
         auto method = methods[m];
-        string method_name = (method == SortMethod::PARALLEL_NAIVE) ? "ParallelNaive" : "SingleThread";
+        string method_name = "";
+        if (method == SortMethod::SINGLE_THREAD)
+            method_name = "SingleThread";
+        else if (method == SortMethod::PARALLEL_NAIVE)
+            method_name = "ParallelNaive";
+        else if (method == SortMethod::PARALLEL_SHARED)
+            method_name = "ParallelShared";
+
         cout << "\nTesting " << type_name << " with " << method_name << " sort" << endl;
 
         for (int s = 0; s < 7; s++) {  // assuming 7 sizes as in original array
