@@ -69,10 +69,10 @@ int main() {
     // Run tests for each type
     // Can't run all at once -> Shared memory can't have same name and diff types
     //runTestForType<uint32_t>("uint32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
-    // runTestForType<int32_t>("int32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    runTestForType<int32_t>("int32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     //runTestForType<uint64_t>("uint64", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     //runTestForType<int64_t>("int64", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
-    runTestForType<float>("float", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    //runTestForType<float>("float", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     //runTestForType<double>("double", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     
     outfile.close();
