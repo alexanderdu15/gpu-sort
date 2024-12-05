@@ -24,7 +24,7 @@ void runTestForType(const string& type_name, uint32_t* sizes, int RUNS_PER_SIZE,
 
         cout << "\nTesting " << type_name << " with " << method_name << " sort" << endl;
 
-        for (int s = 0; s < 8; s++) {  // assuming 8 sizes as in original array
+        for (int s = 0; s < 16; s++) {  // assuming 8 sizes as in original array
             uint32_t size = sizes[s];
             cout << "Array size " << size << "..." << endl;
 
@@ -50,7 +50,7 @@ void runTestForType(const string& type_name, uint32_t* sizes, int RUNS_PER_SIZE,
 }
 
 int main() {
-    uint32_t sizes[] = {10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000}; //TODO: compare performance between perfect powers of 2 vs non-powers
+    uint32_t sizes[] = {8, 10, 100, 128, 1000, 1024, 10000, 16384, 100000, 131072, 1000000, 1048576, 10000000, 16777216, 100000000, 134217728};
     const int RUNS_PER_SIZE = 3;
     SortMethod methods[] = {
         // SortMethod::SINGLE_THREAD, // too slow to test!
@@ -69,10 +69,10 @@ int main() {
     // Run tests for each type
     // Can't run all at once -> Shared memory can't have same name and diff types
     //runTestForType<uint32_t>("uint32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
-    runTestForType<int32_t>("int32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    // runTestForType<int32_t>("int32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     //runTestForType<uint64_t>("uint64", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     //runTestForType<int64_t>("int64", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
-    //runTestForType<float>("float", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    runTestForType<float>("float", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     //runTestForType<double>("double", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     
     outfile.close();
