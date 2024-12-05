@@ -1,5 +1,5 @@
 NVCC = nvcc
-FLAGS = --compiler-options '-Wall -Wextra -std=c++17 -O3'
+FLAGS = --compiler-options '-Wall -Wextra -std=c++11 -O3'
 
 # Create build and results directory if they don't exist
 $(shell mkdir -p build)

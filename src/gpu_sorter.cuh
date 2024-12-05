@@ -5,10 +5,12 @@
 #include <type_traits>
 #include "single_thread_merge.cuh"
 #include "parallel_merge_naive.cuh"
+#include "parallel_merge_shared_mem.cuh"
 
 enum class SortMethod {
     SINGLE_THREAD,
-    PARALLEL_NAIVE
+    PARALLEL_NAIVE,
+    PARALLEL_SHARED_MEM
 };
 
 template<typename T>
@@ -37,17 +39,7 @@ public:
     }
 
     void generateRandomData() {
-        if constexpr (std::is_integral_v<T>) {
-            // For integer types
-            for (uint32_t i = 0; i < size; i++) {
-                h_arr[i] = rand() % 1000;
-            }
-        } else if constexpr (std::is_floating_point_v<T>) {
-            // For floating point types
-            for (uint32_t i = 0; i < size; i++) {
-                h_arr[i] = static_cast<T>(rand()) / RAND_MAX * 1000.0;
-            }
-        }
+        generateRandomDataImpl(std::is_integral<T>());
     }
 
     void sort() {
@@ -63,7 +55,9 @@ public:
         cudaEventRecord(kernel_start);
         if (method == SortMethod::PARALLEL_NAIVE) {
             launchParallelSortNaive();
-        } else {
+        }else if (method == SortMethod::PARALLEL_SHARED_MEM) {
+            launchParallelSortSharedMem();
+        }else {
             launchSingleThreadSort();
         } // TODO: add other methods
         cudaEventRecord(kernel_stop);
@@ -98,9 +92,42 @@ private:
         }
     }
 
+    void launchParallelSortSharedMem() {
+        // Used shared memory for intra-block merge
+        // Used naive version for inter-block merge
+        int threads_per_block = 256;
+        int num_blocks = (size + threads_per_block - 1) / threads_per_block; // round up so all elements are sorted
+        
+        // Local sort within blocks
+        parallelMergeSortSharedMemKernel<T><<<num_blocks, threads_per_block, 2*sizeof(T)*(size+num_blocks-1)/num_blocks>>>(d_arr, d_temp, size);
+        
+        // Merge across blocks, need this becuase we can't sync threads across blocks
+        for (uint32_t stride = threads_per_block; stride < size; stride *= 2) {
+            uint32_t merge_blocks = (size + (2 * stride) - 1) / (2 * stride); // number of blocks needed to merge
+            if (merge_blocks > 0) {
+                mergeBlocksNaiveKernel<T><<<merge_blocks, threads_per_block>>>(d_arr, d_temp, size, stride);
+            }
+        }
+    }
+
     void launchSingleThreadSort() {
         // Launch with 1 thread and 1 block
         singleThreadSortKernel<T><<<1, 1>>>(d_arr, d_temp, size);
+    }
+
+    // Helper functions for different types
+    void generateRandomDataImpl(std::true_type) {
+        // For integer types
+        for (uint32_t i = 0; i < size; i++) {
+            h_arr[i] = rand() % 1000;
+        }
+    }
+
+    void generateRandomDataImpl(std::false_type) {
+        // For floating point types
+        for (uint32_t i = 0; i < size; i++) {
+            h_arr[i] = static_cast<T>(rand()) / RAND_MAX * 1000.0;
+        }
     }
 
 public:
