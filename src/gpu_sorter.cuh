@@ -100,11 +100,13 @@ private:
     void launchParallelSortShared() {
         int threads_per_block = 256; // TODO: try different block sizes?
         int num_blocks = (size + threads_per_block - 1) / threads_per_block; // round up so all elements are sorted
+        int elements_per_block = (size + num_blocks - 1) / num_blocks;
 
         // Local sort within blocks
-        parallelMergeSortSharedKernel<T><<<num_blocks, threads_per_block>>>(d_arr, d_temp, size);
+        size_t shared_mem_size = 2 * elements_per_block * sizeof(T);
+        parallelMergeSortSharedKernel<T><<<num_blocks, threads_per_block, shared_mem_size>>>(d_arr, d_temp, size);
 
-        // Merge across blocks, need this becuase we can't sync threads across blocks
+        // Merge across blocks, need this becuase we can't sync threads across blocksq
         for (uint32_t stride = threads_per_block; stride < size; stride *= 2) {
             uint32_t merge_blocks = (size + (2 * stride) - 1) / (2 * stride); // number of blocks needed to merge
             if (merge_blocks > 0) {

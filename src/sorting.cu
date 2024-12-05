@@ -24,7 +24,7 @@ void runTestForType(const string& type_name, uint32_t* sizes, int RUNS_PER_SIZE,
 
         cout << "\nTesting " << type_name << " with " << method_name << " sort" << endl;
 
-        for (int s = 0; s < 7; s++) {  // assuming 7 sizes as in original array
+        for (int s = 0; s < 8; s++) {  // assuming 8 sizes as in original array
             uint32_t size = sizes[s];
             cout << "Array size " << size << "..." << endl;
 
@@ -50,11 +50,12 @@ void runTestForType(const string& type_name, uint32_t* sizes, int RUNS_PER_SIZE,
 }
 
 int main() {
-    uint32_t sizes[] = {10, 100, 1000, 10000, 100000, 1000000, 10000000}; //TODO: compare performance between perfect powers of 2 vs non-powers
+    uint32_t sizes[] = {10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000}; //TODO: compare performance between perfect powers of 2 vs non-powers
     const int RUNS_PER_SIZE = 3;
     SortMethod methods[] = {
-        SortMethod::SINGLE_THREAD,
-        SortMethod::PARALLEL_NAIVE
+        // SortMethod::SINGLE_THREAD, // too slow to test!
+        SortMethod::PARALLEL_NAIVE,
+        SortMethod::PARALLEL_SHARED
     };
     const int NUM_METHODS = sizeof(methods) / sizeof(methods[0]);
     
@@ -66,12 +67,13 @@ int main() {
     outfile << "Type,Method,Size,Run,Correct,Total Time (ms),Kernel Time (ms)" << endl;
 
     // Run tests for each type
-    runTestForType<uint32_t>("uint32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    // Can't run all at once -> Shared memory can't have same name and diff types
+    //runTestForType<uint32_t>("uint32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     runTestForType<int32_t>("int32", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
-    runTestForType<uint64_t>("uint64", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
-    runTestForType<int64_t>("int64", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
-    runTestForType<float>("float", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
-    runTestForType<double>("double", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    //runTestForType<uint64_t>("uint64", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    //runTestForType<int64_t>("int64", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    //runTestForType<float>("float", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
+    //runTestForType<double>("double", sizes, RUNS_PER_SIZE, methods, NUM_METHODS, outfile);
     
     outfile.close();
     cout << "\nResults have been written to sorting_results_" << string(timestamp) << ".csv" << endl;

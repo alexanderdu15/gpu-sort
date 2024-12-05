@@ -1,38 +1,46 @@
 // Merge two sorted sequences within a thread block
 template<typename T>
-__device__ void blockMergeShared(T *arr, T *temp, int left, int mid, int right) {
+__device__ void blockMergeShared(T *shared_arr, T *shared_temp, int left, int mid, int right) {
+    // Convert to local indices (relative to shared memory)
+    int local_left = left;
+    int local_mid = mid;
+    int local_right = right;
+    
     int tid = threadIdx.x;
-    int total_elements = right - left + 1;
+    int total_elements = local_right - local_left + 1;
     
     int elements_per_thread = (total_elements + blockDim.x - 1) / blockDim.x;
-    int start = left + tid * elements_per_thread;
-    int end = min(start + elements_per_thread, right + 1);
+    int start = local_left + tid * elements_per_thread;
+    int end = min(start + elements_per_thread, local_right + 1);
     
     int i = start;
-    int j = mid + 1;
+    int j = local_mid + 1;
     int k = start;
     
-    while (i <= mid && j <= right && k < end) {
-        if (arr[i] <= arr[j]) {
-            temp[k++] = arr[i++];
+    // Merge the portions this thread is responsible for
+    while (i <= local_mid && j <= local_right && k < end) {
+        if (shared_arr[i] <= shared_arr[j]) {
+            shared_temp[k++] = shared_arr[i++];
         } else {
-            temp[k++] = arr[j++];
+            shared_temp[k++] = shared_arr[j++];
         }
     }
     
-    while (i <= mid && k < end) {
-        temp[k++] = arr[i++];
+    while (i <= local_mid && k < end) {
+        shared_temp[k++] = shared_arr[i++];
     }
     
-    while (j <= right && k < end) {
-        temp[k++] = arr[j++];
+    while (j <= local_right && k < end) {
+        shared_temp[k++] = shared_arr[j++];
     }
     
     __syncthreads();
     
+    // Copy back from temp to shared array
     for (int p = start; p < end; p++) {
-        arr[p] = temp[p];
+        shared_arr[p] = shared_temp[p];
     }
+    __syncthreads();
 }
 
 template<typename T>
@@ -42,18 +50,30 @@ __global__ void parallelMergeSortSharedKernel(T *arr, T *temp, int size) {
     int block_start = blockIdx.x * elements_per_block;
     int block_end = min(block_start + elements_per_block - 1, size - 1);
 
-    // Cooperatively load global data into shared memory
+    extern __shared__ T shared_mem[];
+    T* shared_arr = (T*)shared_mem;
+    T* shared_temp = shared_arr + elements_per_block;
+
     if (threadIdx.x < elements_per_block) {
+        // Cooperatively load global data into shared memory
+        shared_arr[threadIdx.x] = arr[block_start + threadIdx.x];
+        __syncthreads();
+
         // Local sort within block
-        for (int curr_size = 1; curr_size < (block_end - block_start + 1); curr_size *= 2) {
-            for (int left_start = block_start; left_start < block_end; left_start += 2*curr_size) {
-                int mid = min(left_start + curr_size - 1, block_end);
-                int right_end = min(left_start + 2*curr_size - 1, block_end);
-                blockMergeNaive(arr, temp, left_start, mid, right_end);
+        for (int curr_size = 1; curr_size <= (block_end - block_start + 1); curr_size *= 2) {
+            for (int left_start = 0; left_start < elements_per_block; left_start += 2*curr_size) {
+                int mid = min(left_start + curr_size - 1, elements_per_block - 1);
+                int right_end = min(left_start + 2*curr_size - 1, elements_per_block - 1);
+                
+                // Use local indices for shared memory operations
+                blockMergeShared(shared_arr, shared_temp, left_start, mid, right_end);
             }
-            
             __syncthreads();
         }
+
+        // Write back to global memory
+        __syncthreads();
+        arr[block_start + threadIdx.x] = shared_arr[threadIdx.x];
     }
 }
 
@@ -66,6 +86,6 @@ __global__ void mergeBlocksSharedKernel(T *arr, T *temp, int size, int stride) {
     int right = min(left + 2 * stride - 1, size - 1);
     
     if (mid < right) {
-        blockMergeNaive(arr, temp, left, mid, right);
+        blockMergeShared(arr, temp, left, mid, right);
     }
 } 
