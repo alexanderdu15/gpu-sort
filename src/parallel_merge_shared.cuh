@@ -37,6 +37,7 @@ __device__ void blockMergeShared(T *shared_arr, T *shared_temp, int left, int mi
     __syncthreads();
     
     // Copy back from temp to shared array
+    #pragma unroll
     for (int p = start; p < end; p++) {
         shared_arr[p] = shared_temp[p];
     }
@@ -60,7 +61,9 @@ __global__ void parallelMergeSortSharedKernel(T *arr, T *temp, int size) {
         __syncthreads();
 
         // Local sort within block
+        #pragma unroll 8
         for (int curr_size = 1; curr_size <= (block_end - block_start + 1); curr_size *= 2) {
+            #pragma unroll 4
             for (int left_start = 0; left_start < elements_per_block; left_start += 2*curr_size) {
                 int mid = min(left_start + curr_size - 1, elements_per_block - 1);
                 int right_end = min(left_start + 2*curr_size - 1, elements_per_block - 1);

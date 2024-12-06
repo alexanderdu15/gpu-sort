@@ -23,10 +23,11 @@ private:
     float total_time;       // Total time including transfers
     float kernel_time;      // Kernel execution time only
     SortMethod method;      // Sorting method
+    int threads_per_block;  // Store the block size
 
 public:
-    GPUSorter(size_t array_size, SortMethod sort_method = SortMethod::PARALLEL_NAIVE) 
-        : size(array_size), method(sort_method) {
+    GPUSorter(size_t array_size, SortMethod sort_method = SortMethod::PARALLEL_NAIVE, int block_size = 256) 
+        : size(array_size), method(sort_method), threads_per_block(block_size) {
         h_arr = new T[size];
         cudaMalloc(&d_arr, size * sizeof(T));
         cudaMalloc(&d_temp, size * sizeof(T));
@@ -56,9 +57,9 @@ public:
         if (method == SortMethod::SINGLE_THREAD) {
             launchSingleThreadSort();
         } else if (method == SortMethod::PARALLEL_NAIVE) {
-            launchParallelSortNaive();
+            launchParallelSortNaive(threads_per_block);
         } else if (method == SortMethod::PARALLEL_SHARED) {
-            launchParallelSortShared();
+            launchParallelSortShared(threads_per_block);
         }
         cudaEventRecord(kernel_stop);
 
@@ -81,8 +82,7 @@ private:
         singleThreadSortKernel<T><<<1, 1>>>(d_arr, d_temp, size);
     }
 
-    void launchParallelSortNaive() {
-        int threads_per_block = 256; // TODO: try different block sizes?
+    void launchParallelSortNaive(int threads_per_block) {
         int num_blocks = (size + threads_per_block - 1) / threads_per_block; // round up so all elements are sorted
         
         // Local sort within blocks
@@ -97,8 +97,7 @@ private:
         }
     }
 
-    void launchParallelSortShared() {
-        int threads_per_block = 256; // TODO: try different block sizes?
+    void launchParallelSortShared(int threads_per_block) {
         int num_blocks = (size + threads_per_block - 1) / threads_per_block; // round up so all elements are sorted
         int elements_per_block = (size + num_blocks - 1) / num_blocks;
 
@@ -106,7 +105,7 @@ private:
         size_t shared_mem_size = 2 * elements_per_block * sizeof(T);
         parallelMergeSortSharedKernel<T><<<num_blocks, threads_per_block, shared_mem_size>>>(d_arr, d_temp, size);
 
-        // Merge across blocks, need this becuase we can't sync threads across blocksq
+        // Merge across blocks, need this becuase we can't sync threads across blocks
         for (uint32_t stride = threads_per_block; stride < size; stride *= 2) {
             uint32_t merge_blocks = (size + (2 * stride) - 1) / (2 * stride); // number of blocks needed to merge
             if (merge_blocks > 0) {
