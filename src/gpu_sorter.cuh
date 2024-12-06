@@ -6,6 +6,7 @@
 #include "single_thread_merge.cuh"
 #include "parallel_merge_naive.cuh"
 #include "parallel_merge_shared.cuh"
+#include <cuda_runtime.h>
 
 enum class SortMethod {
     SINGLE_THREAD,
@@ -39,6 +40,20 @@ public:
         cudaFree(d_temp);
     }
 
+    void checkMemoryUsage(const char *message) {
+        size_t freeMem, totalMem;
+        cudaMemGetInfo(&freeMem, &totalMem);
+
+        float freeMemMB = freeMem / (1024.0 * 1024.0);
+        float totalMemMB = totalMem / (1024.0 * 1024.0);
+        float usedMemMB = totalMemMB - freeMemMB;
+
+        std::cout << message << "\n";
+        std::cout << "Used Memory: " << usedMemMB << " MB\n";
+        std::cout << "Free Memory: " << freeMemMB << " MB\n";
+        std::cout << "Total Memory: " << totalMemMB << " MB\n\n";
+    }
+
     void generateRandomData() {
         generateRandomDataImpl(std::is_integral<T>());
     }
@@ -54,6 +69,7 @@ public:
         cudaMemcpy(d_arr, h_arr, size * sizeof(T), cudaMemcpyHostToDevice);
 
         cudaEventRecord(kernel_start);
+        checkMemoryUsage("Before kernel execution");
         if (method == SortMethod::SINGLE_THREAD) {
             launchSingleThreadSort();
         } else if (method == SortMethod::PARALLEL_NAIVE) {
@@ -61,6 +77,7 @@ public:
         } else if (method == SortMethod::PARALLEL_SHARED) {
             launchParallelSortShared(threads_per_block);
         }
+        checkMemoryUsage("After kernel execution");
         cudaEventRecord(kernel_stop);
 
         cudaMemcpy(h_arr, d_arr, size * sizeof(T), cudaMemcpyDeviceToHost);
